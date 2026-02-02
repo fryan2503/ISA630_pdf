@@ -1,0 +1,50 @@
+name: Convert PPTX to PDF
+
+# Trigger the workflow on push, but only when pptx files change
+# Also allows you to run it manually (for the first batch)
+on:
+  push:
+    paths:
+      - '**.pptx'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice --no-install-recommends
+
+      - name: Convert PPTX files
+        run: |
+          # Loop through all pptx files in the repo (including subfolders)
+          find . -name "*.pptx" | while read file; do
+            echo "Converting $file..."
+            dirname=$(dirname "$file")
+            libreoffice --headless --convert-to pdf --outdir "$dirname" "$file"
+          done
+
+      - name: Commit and Push PDFs
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          
+          # Stage all new/modified PDF files
+          git add '**/*.pdf'
+          
+          # Commit and push only if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-generated PDF from PPTX [skip ci]"
+            git push
+          fi
